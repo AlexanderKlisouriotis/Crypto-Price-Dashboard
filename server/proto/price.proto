@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package project_pluto.price;
+
+service PriceService {
+  rpc Subscribe(SubscribeRequest) returns (stream PriceUpdate);
+}
+
+message SubscribeRequest {
+  string ticker = 1;
+}
+
+message PriceUpdate {
+  string ticker = 1;
+  double price = 2;
+}

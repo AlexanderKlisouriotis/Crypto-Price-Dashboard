@@ -1,0 +1,9 @@
+version: v2
+name: buf.build/your-username/project-pluto
+deps: []  # Empty dependencies
+lint:
+  use:
+    - DEFAULT
+breaking:
+  use:
+    - DEFAULT

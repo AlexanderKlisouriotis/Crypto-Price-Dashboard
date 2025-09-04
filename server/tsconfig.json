@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    /* Base Options */
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "allowJs": true,
+
+    /* Strictness */
+    "strict": true,
+    "noUncheckedIndexedAccess": true, // Highly recommended for robustness
+    "exactOptionalPropertyTypes": true,
+
+    /* Build Output */
+    "outDir": "./dist",
+    "removeComments": true,
+    "sourceMap": true,
+    "declaration": true,
+
+    /* Path Mapping (Optional but useful for clean imports) */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "**/*.ts" // Include all TypeScript files in the project
+  ],
+  "exclude": [
+    "node_modules",
+    "dist" // Don't compile the output directory
+  ]
+}

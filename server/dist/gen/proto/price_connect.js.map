@@ -1,0 +1,1 @@
+{"version":3,"file":"price_connect.js","sourceRoot":"","sources":["../../../gen/proto/price_connect.ts"],"names":[],"mappings":"AAMA,OAAO,EAAE,UAAU,EAAE,MAAM,oBAAoB,CAAC;AAKhD,MAAM,CAAC,MAAM,YAAY,GAAG;IAC1B,QAAQ,EAAE,kCAAkC;IAC5C,OAAO,EAAE;QAIP,SAAS,EAAE;YACT,IAAI,EAAE,WAAW;YACjB,CAAC,EAAE,gBAAgB;YACnB,CAAC,EAAE,WAAW;YACd,IAAI,EAAE,UAAU,CAAC,eAAe;SACjC;KACF;CACO,CAAC"}
