@@ -7,5 +7,11 @@ export declare const PriceService: {
             readonly O: any;
             readonly kind: any;
         };
+        readonly removeTicker: {
+            readonly name: "RemoveTicker";
+            readonly I: any;
+            readonly O: any;
+            readonly kind: any;
+        };
     };
 };

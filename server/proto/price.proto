@@ -4,6 +4,7 @@ package project_pluto.price;
 
 service PriceService {
   rpc Subscribe(SubscribeRequest) returns (stream PriceUpdate);
+  rpc RemoveTicker(RemoveTickerRequest) returns (RemoveTickerResponse);
 }
 
 message SubscribeRequest {
@@ -13,4 +14,13 @@ message SubscribeRequest {
 message PriceUpdate {
   string ticker = 1;
   double price = 2;
+}
+
+message RemoveTickerRequest {
+  string ticker = 1;
+}
+
+message RemoveTickerResponse {
+  bool success = 1;
+  string message = 2;
 }

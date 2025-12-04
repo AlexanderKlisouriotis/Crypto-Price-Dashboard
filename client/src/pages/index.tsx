@@ -3,7 +3,7 @@ import Head from 'next/head';
 
 export default function Home() {
   return (
-    <>
+    <div className="container">
       <Head>
         <title>Crypto Price Streamer</title>
         <meta name="description" content="Real-time cryptocurrency price streaming" />
@@ -13,6 +13,6 @@ export default function Home() {
       <main>
         <PriceTicker />
       </main>
-    </>
+    </div>
   );
 }

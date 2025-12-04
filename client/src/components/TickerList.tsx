@@ -6,6 +6,19 @@ interface TickerListProps {
 }
 
 export default function TickerList({ tickers, prices, onRemove, isLoading = false }: TickerListProps) {
+  
+  const handleRemove = async (symbol: string) => {
+    if (isLoading) return;
+    
+    try {
+      // Call the onRemove callback which should handle both UI update AND backend cleanup
+      onRemove(symbol);
+      
+    } catch (error) {
+      console.error(`Failed to remove ticker ${symbol}:`, error);
+    }
+  };
+
   if (tickers.length === 0) {
     return (
       <div className="ticker-list">
@@ -26,7 +39,7 @@ export default function TickerList({ tickers, prices, onRemove, isLoading = fals
               {prices[symbol] ? `$${parseFloat(prices[symbol]).toFixed(2)}` : 'Loading...'}
             </span>
             <button 
-              onClick={() => onRemove(symbol)}
+              onClick={() => handleRemove(symbol)}
               className="remove-btn"
               disabled={isLoading}
               aria-label={`Remove ${symbol}`}

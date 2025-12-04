@@ -10,10 +10,24 @@ export type PriceUpdate = Message<"project_pluto.price.PriceUpdate"> & {
     price: number;
 };
 export declare const PriceUpdateSchema: GenMessage<PriceUpdate>;
+export type RemoveTickerRequest = Message<"project_pluto.price.RemoveTickerRequest"> & {
+    ticker: string;
+};
+export declare const RemoveTickerRequestSchema: GenMessage<RemoveTickerRequest>;
+export type RemoveTickerResponse = Message<"project_pluto.price.RemoveTickerResponse"> & {
+    success: boolean;
+    message: string;
+};
+export declare const RemoveTickerResponseSchema: GenMessage<RemoveTickerResponse>;
 export declare const PriceService: GenService<{
     subscribe: {
         methodKind: "server_streaming";
         input: typeof SubscribeRequestSchema;
         output: typeof PriceUpdateSchema;
+    };
+    removeTicker: {
+        methodKind: "unary";
+        input: typeof RemoveTickerRequestSchema;
+        output: typeof RemoveTickerResponseSchema;
     };
 }>;

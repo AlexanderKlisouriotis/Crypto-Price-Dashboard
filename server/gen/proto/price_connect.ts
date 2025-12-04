@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { PriceUpdate, SubscribeRequest } from "./price_pb.js";
+import { PriceUpdate, RemoveTickerRequest, RemoveTickerResponse, SubscribeRequest } from "./price_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -20,6 +20,15 @@ export const PriceService = {
       I: SubscribeRequest,
       O: PriceUpdate,
       kind: MethodKind.ServerStreaming,
+    },
+    /**
+     * @generated from rpc project_pluto.price.PriceService.RemoveTicker
+     */
+    removeTicker: {
+      name: "RemoveTicker",
+      I: RemoveTickerRequest,
+      O: RemoveTickerResponse,
+      kind: MethodKind.Unary,
     },
   }
 } as const;

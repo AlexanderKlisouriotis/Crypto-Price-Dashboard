@@ -6,17 +6,20 @@ const isBrowser = typeof window !== 'undefined';
 
 const transport = createConnectTransport({
   baseUrl: isBrowser ? '/api' : 'http://localhost:8080',
-  useBinaryFormat: false,
+  useBinaryFormat: true,
+  interceptors: [
+    (next) => async (req) => {
+      console.log('🔍 Client sending request:', req.method.name);
+      try {
+        const response = await next(req);
+        console.log('✅ Client received response:', response);
+        return response;
+      } catch (error) {
+        console.error('❌ Client request failed:', error);
+        throw error;
+      }
+    }
+  ]
 });
 
 export const priceClient = createClient(PriceService, transport);
-
-// Mock client for SSR
-export const mockPriceClient = {
-  subscribe: async function* () {
-    while (true) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      yield null;
-    }
-  }
-};

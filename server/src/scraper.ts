@@ -61,6 +61,8 @@ export class TradingViewScraper {
     try {
       const page = await this.context.newPage();
       
+
+      
       // Set up DOM mutation observer before navigating
       await page.exposeFunction('onPriceUpdate', (price: number) => {
         const callback = this.activeSubscriptions.get(ticker);
@@ -82,19 +84,14 @@ export class TradingViewScraper {
         const observePriceChanges = () => {
           // Try multiple selectors for the price element
           const selectors = [
-            '.lastContainer-zoF9r75I',
-            '[data-symbol*="BINANCE"] [class*="price"]',
-            '[data-symbol*="BINANCE"] [class*="last"]',
-            '.price-value',
-            '[data-role="price"]'
+            '.lastContainer-zoF9r75I'
           ];
           
           let priceElement = null;
           for (const selector of selectors) {
             priceElement = document.querySelector(selector);
             if (priceElement) break;
-          }
-          
+          } 
           if (priceElement) {
             // Create a MutationObserver to watch for price changes
             const observer = new MutationObserver((mutations) => {
@@ -140,11 +137,14 @@ export class TradingViewScraper {
       });
 
       // Navigate to the page
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-      
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 5000 });
+
+      const test = await page.url();
+
+
       // Store the page reference
       this.pages.set(ticker, page);
-      
+          
       console.log(`✅ Page for ${ticker} setup complete`);
       
     } catch (error) {
@@ -199,15 +199,23 @@ export class TradingViewScraper {
       throw new Error(`Page for ${normalizedTicker} not found`);
     }
 
+
+
     try {
+
+       const notFound = await page.evaluate(() => {
+      // Check for TradingView's 404 indicators
+      return document.querySelector('.tv-http-error-page') !== null;
+      });
+
+      if(notFound)
+      {
+        throw new Error(`Ticker ${ticker} not found (404)`);
+      }
       // Evaluate in the page context to get the current price
       const priceText = await page.evaluate(() => {
         const selectors = [
-          '.lastContainer-zoF9r75I',
-          '[data-symbol*="BINANCE"] [class*="price"]',
-          '[data-symbol*="BINANCE"] [class*="last"]',
-          '.price-value',
-          '[data-role="price"]'
+          '.lastContainer-zoF9r75I'
         ];
         
         for (const selector of selectors) {
@@ -216,9 +224,17 @@ export class TradingViewScraper {
             return element.textContent;
           }
         }
+        if(document.querySelector('.tv-http-error-page__title')?.textContent == "This isn't the page you're looking for")
+          {
+            this.closeTickerPage(ticker);
+            console.log("test");
+          }
+
         return null;
       });
 
+      
+      
       if (!priceText) {
         throw new Error(`Could not find price for ${ticker}`);
       }
@@ -237,10 +253,29 @@ export class TradingViewScraper {
       };
     } catch (error) {
       console.error(`Error getting price for ${ticker}:`, error);
+      if (error instanceof Error && (error.message.includes('404') || error.message.includes('not found'))) {
+      await this.closeTickerPage(normalizedTicker);
+    }
       throw error;
     }
   }
-
+  async closeTickerPage(ticker: string): Promise<void> {
+    const normalizedTicker = ticker.toUpperCase();
+    
+    if (this.pages.has(normalizedTicker)) {
+      const page = this.pages.get(normalizedTicker);
+      if (page) {
+        try {
+          await page.close();
+          this.pages.delete(normalizedTicker);
+          console.log(`✅ Closed Playwright tab for ${normalizedTicker}`);
+        } catch (error) {
+          console.error(`❌ Error closing tab for ${normalizedTicker}:`, error);
+          throw error;
+        }
+      }
+    }
+  }
   async close(): Promise<void> {
     // Close all pages
     for (const [ticker, page] of this.pages) {

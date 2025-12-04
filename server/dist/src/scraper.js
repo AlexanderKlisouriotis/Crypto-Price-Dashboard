@@ -58,11 +58,7 @@ export class TradingViewScraper {
                 let lastPrice = null;
                 const observePriceChanges = () => {
                     const selectors = [
-                        '.lastContainer-zoF9r75I',
-                        '[data-symbol*="BINANCE"] [class*="price"]',
-                        '[data-symbol*="BINANCE"] [class*="last"]',
-                        '.price-value',
-                        '[data-role="price"]'
+                        '.lastContainer-zoF9r75I'
                     ];
                     let priceElement = null;
                     for (const selector of selectors) {
@@ -104,7 +100,8 @@ export class TradingViewScraper {
                     }, 500);
                 }
             });
-            await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+            await page.goto(url, { waitUntil: 'networkidle', timeout: 5000 });
+            const test = await page.url();
             this.pages.set(ticker, page);
             console.log(`✅ Page for ${ticker} setup complete`);
         }
@@ -153,19 +150,25 @@ export class TradingViewScraper {
             throw new Error(`Page for ${normalizedTicker} not found`);
         }
         try {
+            const notFound = await page.evaluate(() => {
+                return document.querySelector('.tv-http-error-page') !== null;
+            });
+            if (notFound) {
+                throw new Error(`Ticker ${ticker} not found (404)`);
+            }
             const priceText = await page.evaluate(() => {
                 const selectors = [
-                    '.lastContainer-zoF9r75I',
-                    '[data-symbol*="BINANCE"] [class*="price"]',
-                    '[data-symbol*="BINANCE"] [class*="last"]',
-                    '.price-value',
-                    '[data-role="price"]'
+                    '.lastContainer-zoF9r75I'
                 ];
                 for (const selector of selectors) {
                     const element = document.querySelector(selector);
                     if (element && element.textContent) {
                         return element.textContent;
                     }
+                }
+                if (document.querySelector('.tv-http-error-page__title')?.textContent == "This isn't the page you're looking for") {
+                    this.closeTickerPage(ticker);
+                    console.log("test");
                 }
                 return null;
             });
@@ -185,7 +188,27 @@ export class TradingViewScraper {
         }
         catch (error) {
             console.error(`Error getting price for ${ticker}:`, error);
+            if (error instanceof Error && (error.message.includes('404') || error.message.includes('not found'))) {
+                await this.closeTickerPage(normalizedTicker);
+            }
             throw error;
+        }
+    }
+    async closeTickerPage(ticker) {
+        const normalizedTicker = ticker.toUpperCase();
+        if (this.pages.has(normalizedTicker)) {
+            const page = this.pages.get(normalizedTicker);
+            if (page) {
+                try {
+                    await page.close();
+                    this.pages.delete(normalizedTicker);
+                    console.log(`✅ Closed Playwright tab for ${normalizedTicker}`);
+                }
+                catch (error) {
+                    console.error(`❌ Error closing tab for ${normalizedTicker}:`, error);
+                    throw error;
+                }
+            }
         }
     }
     async close() {

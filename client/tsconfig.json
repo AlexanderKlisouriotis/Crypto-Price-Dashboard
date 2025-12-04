@@ -28,6 +28,6 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "../server/gen/proto/**/*.ts" // Include the generated proto files
-  ],
+, "next.config.js"  ],
   "exclude": ["node_modules"]
 }

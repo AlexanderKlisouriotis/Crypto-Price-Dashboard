@@ -8,6 +8,12 @@ export const PriceService = {
             O: PriceUpdate,
             kind: MethodKind.ServerStreaming,
         },
+        removeTicker: {
+            name: "RemoveTicker",
+            I: RemoveTickerRequest,
+            O: RemoveTickerResponse,
+            kind: MethodKind.Unary,
+        },
     }
 };
 //# sourceMappingURL=price_connect.js.map

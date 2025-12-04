@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file proto/price.proto.
  */
 export const file_proto_price: GenFile = /*@__PURE__*/
-  fileDesc("ChFwcm90by9wcmljZS5wcm90bxITcHJvamVjdF9wbHV0by5wcmljZSIiChBTdWJzY3JpYmVSZXF1ZXN0Eg4KBnRpY2tlchgBIAEoCSIsCgtQcmljZVVwZGF0ZRIOCgZ0aWNrZXIYASABKAkSDQoFcHJpY2UYAiABKAEyZgoMUHJpY2VTZXJ2aWNlElYKCVN1YnNjcmliZRIlLnByb2plY3RfcGx1dG8ucHJpY2UuU3Vic2NyaWJlUmVxdWVzdBogLnByb2plY3RfcGx1dG8ucHJpY2UuUHJpY2VVcGRhdGUwAWIGcHJvdG8z");
+  fileDesc("ChFwcm90by9wcmljZS5wcm90bxITcHJvamVjdF9wbHV0by5wcmljZSIiChBTdWJzY3JpYmVSZXF1ZXN0Eg4KBnRpY2tlchgBIAEoCSIsCgtQcmljZVVwZGF0ZRIOCgZ0aWNrZXIYASABKAkSDQoFcHJpY2UYAiABKAEiJQoTUmVtb3ZlVGlja2VyUmVxdWVzdBIOCgZ0aWNrZXIYASABKAkiOAoUUmVtb3ZlVGlja2VyUmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJMssBCgxQcmljZVNlcnZpY2USVgoJU3Vic2NyaWJlEiUucHJvamVjdF9wbHV0by5wcmljZS5TdWJzY3JpYmVSZXF1ZXN0GiAucHJvamVjdF9wbHV0by5wcmljZS5QcmljZVVwZGF0ZTABEmMKDFJlbW92ZVRpY2tlchIoLnByb2plY3RfcGx1dG8ucHJpY2UuUmVtb3ZlVGlja2VyUmVxdWVzdBopLnByb2plY3RfcGx1dG8ucHJpY2UuUmVtb3ZlVGlja2VyUmVzcG9uc2ViBnByb3RvMw");
 
 /**
  * @generated from message project_pluto.price.SubscribeRequest
@@ -52,6 +52,45 @@ export const PriceUpdateSchema: GenMessage<PriceUpdate> = /*@__PURE__*/
   messageDesc(file_proto_price, 1);
 
 /**
+ * @generated from message project_pluto.price.RemoveTickerRequest
+ */
+export type RemoveTickerRequest = Message<"project_pluto.price.RemoveTickerRequest"> & {
+  /**
+   * @generated from field: string ticker = 1;
+   */
+  ticker: string;
+};
+
+/**
+ * Describes the message project_pluto.price.RemoveTickerRequest.
+ * Use `create(RemoveTickerRequestSchema)` to create a new message.
+ */
+export const RemoveTickerRequestSchema: GenMessage<RemoveTickerRequest> = /*@__PURE__*/
+  messageDesc(file_proto_price, 2);
+
+/**
+ * @generated from message project_pluto.price.RemoveTickerResponse
+ */
+export type RemoveTickerResponse = Message<"project_pluto.price.RemoveTickerResponse"> & {
+  /**
+   * @generated from field: bool success = 1;
+   */
+  success: boolean;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message project_pluto.price.RemoveTickerResponse.
+ * Use `create(RemoveTickerResponseSchema)` to create a new message.
+ */
+export const RemoveTickerResponseSchema: GenMessage<RemoveTickerResponse> = /*@__PURE__*/
+  messageDesc(file_proto_price, 3);
+
+/**
  * @generated from service project_pluto.price.PriceService
  */
 export const PriceService: GenService<{
@@ -62,6 +101,14 @@ export const PriceService: GenService<{
     methodKind: "server_streaming";
     input: typeof SubscribeRequestSchema;
     output: typeof PriceUpdateSchema;
+  },
+  /**
+   * @generated from rpc project_pluto.price.PriceService.RemoveTicker
+   */
+  removeTicker: {
+    methodKind: "unary";
+    input: typeof RemoveTickerRequestSchema;
+    output: typeof RemoveTickerResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_proto_price, 0);

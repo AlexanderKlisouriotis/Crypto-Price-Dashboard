@@ -1,5 +1,5 @@
 import { nextJsApiRouter } from '@connectrpc/connect-next';
-import { PriceService } from '../../../../../server/gen/price_pb';
+import { PriceService } from '../../../../../server/gen/proto/price_pb';
 import { priceServiceImpl } from '../../../../../server/src/price-service';
 
 

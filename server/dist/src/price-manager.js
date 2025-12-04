@@ -3,7 +3,7 @@ export class PriceManager {
     activeTickers = new Map();
     scraper = getScraper();
     isScraperInitialized = false;
-    UPDATE_INTERVAL = 2000;
+    UPDATE_INTERVAL = 100;
     async initialize() {
         if (this.isScraperInitialized)
             return;
@@ -18,37 +18,77 @@ export class PriceManager {
         if (!this.isScraperInitialized) {
             await this.initialize();
         }
-        let activeTicker = this.activeTickers.get(normalizedTicker);
-        if (!activeTicker) {
-            activeTicker = {
-                subscribers: new Set(),
-                intervalId: null,
-                lastPrice: null
-            };
-            this.activeTickers.set(normalizedTicker, activeTicker);
-            await this.startPolling(normalizedTicker);
+        try {
+            let activeTicker = this.activeTickers.get(normalizedTicker);
+            if (!activeTicker) {
+                activeTicker = {
+                    subscribers: new Set(),
+                    intervalId: null,
+                    lastPrice: null
+                };
+                this.activeTickers.set(normalizedTicker, activeTicker);
+                await this.startPolling(normalizedTicker);
+            }
+            activeTicker.subscribers.add(subscriber);
+            console.log(`Added subscriber for ${normalizedTicker}. Total subscribers: ${activeTicker.subscribers.size}`);
+            if (activeTicker.lastPrice !== null) {
+                try {
+                    subscriber.sendUpdate({
+                        ticker: normalizedTicker,
+                        price: activeTicker.lastPrice,
+                        timestamp: new Date()
+                    });
+                }
+                catch (error) {
+                    console.error(`Error sending initial update to subscriber for ${normalizedTicker}:`, error);
+                    this.unsubscribe(normalizedTicker, subscriber);
+                }
+            }
         }
-        activeTicker.subscribers.add(subscriber);
-        console.log(`Added subscriber for ${normalizedTicker}. Total subscribers: ${activeTicker.subscribers.size}`);
-        if (activeTicker.lastPrice !== null) {
-            subscriber.sendUpdate({
-                ticker: normalizedTicker,
-                price: activeTicker.lastPrice,
-                timestamp: new Date()
-            });
+        catch (error) {
+            console.error(`❌ Failed to subscribe to ${normalizedTicker}:`, error);
+            throw error;
         }
     }
     unsubscribe(ticker, subscriber) {
         const normalizedTicker = ticker.toUpperCase();
         const activeTicker = this.activeTickers.get(normalizedTicker);
         if (activeTicker) {
-            activeTicker.subscribers.delete(subscriber);
-            console.log(`Removed subscriber for ${normalizedTicker}. Remaining subscribers: ${activeTicker.subscribers.size}`);
-            if (activeTicker.subscribers.size === 0) {
-                this.stopPolling(normalizedTicker);
-                this.activeTickers.delete(normalizedTicker);
-                console.log(`Stopped polling for ${normalizedTicker} - no more subscribers`);
+            if (activeTicker.subscribers.has(subscriber)) {
+                activeTicker.subscribers.delete(subscriber);
+                console.log(`Removed subscriber for ${normalizedTicker}. Remaining subscribers: ${activeTicker.subscribers.size}`);
+                if (activeTicker.subscribers.size === 0) {
+                    this.stopPolling(normalizedTicker);
+                    this.activeTickers.delete(normalizedTicker);
+                    console.log(`Stopped polling for ${normalizedTicker} - no more subscribers`);
+                }
             }
+            else {
+                console.log(`Subscriber not found for ${normalizedTicker} during unsubscribe`);
+            }
+        }
+    }
+    async removeTicker(ticker) {
+        const normalizedTicker = ticker.toUpperCase();
+        const activeTicker = this.activeTickers.get(normalizedTicker);
+        if (activeTicker) {
+            console.log(`🧹 Removing ticker ${normalizedTicker} and cleaning up resources`);
+            this.stopPolling(normalizedTicker);
+            activeTicker.subscribers.clear();
+            this.activeTickers.delete(normalizedTicker);
+            try {
+                await this.scraper.closeTickerPage(normalizedTicker);
+                console.log(`✅ Closed Playwright tab for ${normalizedTicker}`);
+            }
+            catch (error) {
+                console.error(`❌ Error closing Playwright tab for ${normalizedTicker}:`, error);
+            }
+            console.log(`✅ Fully removed ticker ${normalizedTicker}`);
+        }
+    }
+    async ensureInitialized() {
+        if (!this.isScraperInitialized) {
+            await this.initialize();
         }
     }
     async startPolling(ticker) {
@@ -57,7 +97,12 @@ export class PriceManager {
             return;
         }
         console.log(`Starting polling for ${ticker}`);
+        let shouldStopPolling = false;
         const poll = async () => {
+            if (shouldStopPolling) {
+                this.stopPolling(ticker);
+                return;
+            }
             try {
                 const priceData = await this.scraper.getPrice(ticker);
                 activeTicker.lastPrice = priceData.price;
@@ -65,10 +110,26 @@ export class PriceManager {
             }
             catch (error) {
                 console.error(`Error polling ${ticker}:`, error);
+                if (error instanceof Error && (error.message.includes('404') || error.message.includes('not found'))) {
+                    console.error(`❌ Ticker ${ticker} not found, stopping polling`);
+                    shouldStopPolling = true;
+                    this.stopPolling(ticker);
+                    this.activeTickers.delete(ticker);
+                    await this.scraper.closeTickerPage(ticker);
+                    this.notifySubscribersOfError(ticker, `Ticker ${ticker} not found`);
+                    throw new Error(`Ticker ${ticker} not found on TradingView`);
+                }
             }
         };
-        await poll();
-        activeTicker.intervalId = setInterval(poll, this.UPDATE_INTERVAL);
+        try {
+            await poll();
+            if (this.activeTickers.has(ticker) && !shouldStopPolling) {
+                activeTicker.intervalId = setInterval(poll, this.UPDATE_INTERVAL);
+            }
+        }
+        catch (error) {
+            console.error(`Failed initial poll for ${ticker}:`, error);
+        }
     }
     stopPolling(ticker) {
         const activeTicker = this.activeTickers.get(ticker);
@@ -78,11 +139,32 @@ export class PriceManager {
             console.log(`Stopped polling for ${ticker}`);
         }
     }
+    notifySubscribersOfError(ticker, errorMessage) {
+        const activeTicker = this.activeTickers.get(ticker);
+        if (activeTicker) {
+            const subscribers = Array.from(activeTicker.subscribers);
+            subscribers.forEach(subscriber => {
+                try {
+                    subscriber.sendUpdate({
+                        ticker,
+                        price: -404,
+                        timestamp: new Date()
+                    });
+                    console.error(`Error for ${ticker}: ${errorMessage}`);
+                }
+                catch (subError) {
+                    console.error(`Error notifying subscriber:`, subError);
+                }
+            });
+            activeTicker.subscribers.clear();
+        }
+    }
     broadcastUpdate(priceData) {
         const activeTicker = this.activeTickers.get(priceData.ticker);
         if (activeTicker) {
-            console.log(`Broadcasting update for ${priceData.ticker}: $${priceData.price} to ${activeTicker.subscribers.size} subscribers`);
-            activeTicker.subscribers.forEach(subscriber => {
+            const subscribers = Array.from(activeTicker.subscribers);
+            console.log(`Broadcasting update for ${priceData.ticker}: $${priceData.price} to ${subscribers.length} subscribers`);
+            subscribers.forEach(subscriber => {
                 try {
                     subscriber.sendUpdate(priceData);
                 }

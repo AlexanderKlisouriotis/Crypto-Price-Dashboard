@@ -2,13 +2,13 @@ import { nextJsApiRouter } from '@connectrpc/connect-next';
 import { PriceService } from '../../../../server/gen/proto/price_pb';
 import { createConnectTransport } from '@connectrpc/connect-node';
 import { createClient } from '@connectrpc/connect';
-import { NextApiRequest, NextApiResponse } from 'next';
+import { NextApiRequest, NextApiResponse, PageConfig } from 'next';
 
 // Create transport to your backend server with correct content type
 const backendTransport = createConnectTransport({
   baseUrl: 'http://localhost:8080',
   httpVersion: '1.1',
-  useBinaryFormat: false, // This is likely what your server expects
+  useBinaryFormat: true,
 });
 
 const backendClient = createClient(PriceService, backendTransport);
@@ -19,10 +19,10 @@ const { handler } = nextJsApiRouter({
     router.service(PriceService, {
       async *subscribe(request) {
         console.log('🔁 Frontend API route received request for ticker:', request.ticker);
-        
+
         try {
           const stream = backendClient.subscribe(request);
-          
+
           for await (const update of stream) {
             console.log('📨 Forwarding update:', update.ticker, update.price);
             yield update;
@@ -37,13 +37,14 @@ const { handler } = nextJsApiRouter({
 });
 
 // Export as default handler for Next.js
-export default function handleRequest(req: NextApiRequest, res: NextApiResponse) {
-  return handler(req, res);
+export default async function handleRequest(req: NextApiRequest, res: NextApiResponse) {
+  await handler(req, res);
 }
 
 
+
 // Configure API route
-export const config = {
+export const config: PageConfig = {
   api: {
     bodyParser: false,
     responseLimit: false,

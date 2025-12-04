@@ -11,7 +11,7 @@ export default function TickerForm({ onAdd, isLoading = false }: TickerFormProps
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedSymbol = symbol.trim().toUpperCase().replace('/', '');
-    if (trimmedSymbol && /^[A-Z0-9]{3,10}$/.test(trimmedSymbol)) {
+    if (trimmedSymbol && /^[a-zA-Z0-9]{3,10}$/.test(trimmedSymbol)) {
       onAdd(trimmedSymbol);
       setSymbol('');
     }
@@ -24,8 +24,8 @@ export default function TickerForm({ onAdd, isLoading = false }: TickerFormProps
         value={symbol}
         onChange={(e) => setSymbol(e.target.value)}
         placeholder="Enter symbol (e.g., BTCUSD)"
-        pattern="[A-Z0-9]{3,10}"
-        title="3-10 uppercase letters or numbers"
+        pattern="[a-zA-Z0-9]{3,10}"
+        title="3-10 letters or numbers"
         required
         disabled={isLoading}
       />

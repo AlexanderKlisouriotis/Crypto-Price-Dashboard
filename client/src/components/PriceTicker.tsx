@@ -1,16 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
-import { priceClient, mockPriceClient } from '@/lib/price-client';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { priceClient } from '@/lib/price-client';
 import TickerForm from './TickerForm';
 import TickerList from './TickerList';
 import ConnectionStatus from './ConnectionStatus';
+import { Code, ConnectError } from '@connectrpc/connect';
 
 interface Subscription {
   symbol: string;
-  stream: AsyncIterable<any>;
   controller: AbortController;
+  isActive: boolean;
 }
-
-const client = typeof window === 'undefined' ? mockPriceClient : priceClient;
 
 export default function PriceTicker() {
   const [tickers, setTickers] = useState<string[]>([]);
@@ -18,100 +17,131 @@ export default function PriceTicker() {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [subscriptions, setSubscriptions] = useState<Map<string, Subscription>>(new Map());
+  
+  // Use refs for subscriptions to avoid stale closures
+  const subscriptionsRef = useRef<Map<string, Subscription>>(new Map());
+  const isMountedRef = useRef(true);
 
-  const subscribeToTicker = useCallback(async (symbol: string) => {
-    if (subscriptions.has(symbol)) return;
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      // Clean up all subscriptions on unmount
+      subscriptionsRef.current.forEach(sub => {
+        sub.isActive = false;
+        sub.controller.abort();
+      });
+      subscriptionsRef.current.clear();
+    };
+  }, []);
 
-    try {
-      setIsLoading(true);
-      const controller = new AbortController();
-      
-      // Create the request object
-      const request = { ticker: symbol };
-      
-      const stream = client.subscribe(request, { signal: controller.signal });
-      
-      const subscription: Subscription = {
-        symbol,
-        stream,
-        controller
-      };
+ const subscribeToTicker = useCallback(async (symbol: string) => {
+  if (subscriptionsRef.current.has(symbol)) return;
 
-      setSubscriptions(prev => new Map(prev).set(symbol, subscription));
+  try {
+    setIsLoading(true);
+    const controller = new AbortController();
+    
+    const subscription: Subscription = {
+      symbol,
+      controller,
+      isActive: true
+    };
 
-      // Process the stream
-      (async () => {
-        try {
-          for await (const update of stream) {
-            if (update && update.ticker && update.price !== undefined) {
-              console.log(`Received price update for ${update.ticker}: ${update.price}`);
-              setPrices(prev => ({
-                ...prev,
-                [update.ticker]: update.price.toString()
-              }));
-              
-              // Add to tickers list if not already there
-              setTickers(prev => {
-                if (!prev.includes(update.ticker)) {
-                  return [...prev, update.ticker].sort();
-                }
-                return prev;
-              });
-            }
+    subscriptionsRef.current.set(symbol, subscription);
+
+    const request = { ticker: symbol };
+    const stream = priceClient.subscribe(request, { signal: controller.signal });
+    
+    // Process the stream in a separate async function
+    (async () => {
+      try {
+        for await (const update of stream) {
+          const currentSub = subscriptionsRef.current.get(symbol);
+          if (!currentSub?.isActive || !isMountedRef.current) {
+            break;
           }
-        } catch (err: any) {
-          if (err.name !== 'AbortError') {
-            console.error(`Stream error for ${symbol}:`, err);
-            setError(`Connection lost for ${symbol}`);
-            // Remove the subscription on error
-            setSubscriptions(prev => {
-              const newSubs = new Map(prev);
-              newSubs.delete(symbol);
-              return newSubs;
+          if(update.price === -404)
+          {
+            unsubscribeFromTicker(symbol);
+          }
+          if (update && update.ticker && update.price !== undefined) {
+            setPrices(prev => ({
+              ...prev,
+              [update.ticker]: update.price.toString()
+            }));
+            
+            setTickers(prev => {
+              if (!prev.includes(update.ticker)) {
+                return [...prev, update.ticker].sort();
+              }
+              return prev;
             });
           }
         }
-      })();
-
-    } catch (err: any) {
-      console.error(`Failed to subscribe to ${symbol}:`, err);
-      setError(`Failed to subscribe to ${symbol}: ${err.message}`);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [subscriptions]);
-
-  const unsubscribeFromTicker = useCallback(async (symbol: string) => {
-    try {
-      const subscription = subscriptions.get(symbol);
-      if (subscription) {
-        subscription.controller.abort();
-        setSubscriptions(prev => {
-          const newSubs = new Map(prev);
-          newSubs.delete(symbol);
-          return newSubs;
-        });
+      } catch (err: any) {
+        const currentSub = subscriptionsRef.current.get(symbol);
+        if (currentSub?.isActive && isMountedRef.current && err.name !== 'AbortError') {
+          console.error(`Stream error for ${symbol}:`, err);
+          
+          // HANDLE CONNECTERROR SPECIFICALLY
+          if (err instanceof ConnectError) {
+            if (err.code === Code.NotFound) {
+              setError(`Ticker ${symbol} not found on TradingView`);
+            } else {
+              setError(`Error with ${symbol}: ${err.message}`);
+            }
+          } else {
+            setError(`Connection lost for ${symbol}`);
+          }
+          unsubscribeFromTicker(symbol);
+        }
       }
+    })();
 
-      setTickers(prev => prev.filter(t => t !== symbol).sort());
-      setPrices(prev => {
-        const newPrices = { ...prev };
-        delete newPrices[symbol];
-        return newPrices;
-      });
-      
-      console.log(`Unsubscribed from ${symbol}`);
-    } catch (err: any) {
-      console.error(`Failed to unsubscribe from ${symbol}:`, err);
-      setError(`Failed to unsubscribe from ${symbol}: ${err.message}`);
+  } catch (err: any) {
+    console.error(`Failed to subscribe to ${symbol}:`, err);
+    
+    // HANDLE CONNECTERROR IN INITIAL SUBSCRIPTION
+    if (err instanceof ConnectError) {
+      if (err.code === Code.NotFound) {
+        setError(`Ticker ${symbol} not found on TradingView`);
+      } else {
+        setError(`Failed to subscribe to ${symbol}: ${err.message}`);
+      }
+    } else {
+      setError(`Failed to subscribe to ${symbol}: ${err.message}`);
     }
-  }, [subscriptions]);
+    throw err;
+  } finally {
+    setIsLoading(false);
+  }
+}, []);
+
+  const unsubscribeFromTicker = useCallback((symbol: string) => {
+    const subscription = subscriptionsRef.current.get(symbol);
+    if (subscription) {
+      // Mark as inactive first, then abort
+      subscription.isActive = false;
+      subscription.controller.abort();
+      subscriptionsRef.current.delete(symbol);
+    }
+
+    setTickers(prev => prev.filter(t => t !== symbol));
+    setPrices(prev => {
+      const newPrices = { ...prev };
+      delete newPrices[symbol];
+      return newPrices;
+    });
+    
+    console.log(`Unsubscribed from ${symbol}`);
+  }, []);
 
   const addTicker = useCallback(async (symbol: string) => {
-    if (tickers.includes(symbol)) {
-      setError(`${symbol} is already being tracked`);
+    const normalizedSymbol = symbol.toUpperCase();
+    
+    if (tickers.includes(normalizedSymbol)) {
+      setError(`${normalizedSymbol} is already being tracked`);
       return;
     }
 
@@ -119,65 +149,71 @@ export default function PriceTicker() {
       setIsLoading(true);
       setError(null);
       
-      await subscribeToTicker(symbol);
-      
-      // Update UI - the stream handler will add it to tickers
-      console.log(`Successfully added ticker: ${symbol}`);
+      let test = await subscribeToTicker(normalizedSymbol);
+     
+      console.log(`Successfully added ticker: ${normalizedSymbol}`);
       
     } catch (err: any) {
-      console.error(`Failed to add ticker ${symbol}:`, err);
-      setError(`Failed to add ${symbol}: ${err.message}`);
+      console.error(`Failed to add ticker ${normalizedSymbol}:`, err);
+      setError(`Failed to add ${normalizedSymbol}: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
   }, [tickers, subscribeToTicker]);
 
-  const removeTicker = useCallback(async (symbol: string) => {
-    await unsubscribeFromTicker(symbol);
-  }, [unsubscribeFromTicker]);
-
-  // Test connection on mount
-useEffect(() => {
-  const testConnection = async () => {
-    try {
-      // Use fetch with mode: 'cors' and proper error handling
-      const response = await fetch('http://localhost:8080/health', {
-        method: 'GET',
-        mode: 'cors', // Explicitly request CORS
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Backend connection successful:', data);
-        setIsConnected(true);
-        setError(null);
-      } else {
-        console.log('❌ Backend health check failed:', response.status);
-        setIsConnected(false);
-        setError(`Backend responded with status: ${response.status}`);
-      }
-    } catch (err) {
-      console.log('❌ Cannot connect to backend:', err);
-      setIsConnected(false);
-      setError('Cannot connect to backend server. Make sure it\'s running on http://localhost:8080');
+  const removeTicker = useCallback(async (symbol: string) => { 
+  try {
+    
+    unsubscribeFromTicker(symbol);
+    
+    const response = await priceClient.removeTicker({ ticker: symbol });
+    
+    if (response.success) {
+      console.log(`✅ ${response.message}`);
+    } else {
+      console.error(`❌ ${response.message}`);
+      setError(response.message);
     }
-  };
+    
+  } catch (error) {
+    console.error(`Failed to remove ticker ${symbol} from Playwright:`, error);
+    setError(`Failed to remove ${symbol} from Playwright: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}, [unsubscribeFromTicker]);
 
-  testConnection();
-  const interval = setInterval(testConnection, 3000); // Check every 3 seconds
-
-  return () => clearInterval(interval);
-}, []);
-
-  // Cleanup on unmount
   useEffect(() => {
-    return () => {
-      subscriptions.forEach(sub => sub.controller.abort());
+    const testConnection = async () => {
+      try {
+        const response = await fetch('http://localhost:8080/health', {
+          method: 'GET',
+          mode: 'cors',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Backend connection successful:', data);
+          setIsConnected(true);
+          setError(null);
+        } else {
+          console.log('❌ Backend health check failed:', response.status);
+          setIsConnected(false);
+          setError(`Backend responded with status: ${response.status}`);
+        }
+      } catch (err) {
+        console.log('❌ Cannot connect to backend:', err);
+        setIsConnected(false);
+        setError('Cannot connect to backend server. Make sure it\'s running on http://localhost:8080');
+      }
     };
-  }, [subscriptions]);
+
+    testConnection();
+    const interval = setInterval(testConnection, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="container">

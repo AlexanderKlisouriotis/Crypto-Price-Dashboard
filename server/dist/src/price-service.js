@@ -1,50 +1,105 @@
-import { getScraper } from './scraper';
+import { Code, ConnectError } from '@connectrpc/connect';
+import { getPriceManager } from './price-manager';
 export const priceServiceImpl = {
     async *subscribe(request) {
         const ticker = request.ticker.toUpperCase();
-        console.log(`📡 Starting REAL TradingView scraping for: ${ticker}`);
-        const scraper = getScraper();
+        console.log(`📡 Starting subscription for: ${ticker}`);
+        const priceManager = getPriceManager();
         try {
-            if (!scraper.isInitialized) {
-                console.log('🔄 Scraper not initialized, initializing now...');
-                await scraper.initialize();
-            }
-            console.log('🔄 Initializing Playwright browser...');
-            await scraper.initialize();
-            console.log('✅ Playwright browser initialized');
-            let errorCount = 0;
-            const MAX_ERRORS = 5;
-            while (true) {
-                try {
-                    console.log(`🌐 Scraping real-time price for ${ticker}...`);
-                    const priceData = await scraper.getPrice(ticker);
-                    console.log(`✅ Real price obtained for ${ticker}: $${priceData.price}`);
-                    yield {
-                        ticker: ticker,
-                        price: priceData.price
-                    };
-                    errorCount = 0;
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                }
-                catch (scrapeError) {
-                    errorCount++;
-                    console.error(`❌ Scraping error for ${ticker} (attempt ${errorCount}/${MAX_ERRORS}):`, scrapeError instanceof Error ? scrapeError.message : String(scrapeError));
-                    if (errorCount >= MAX_ERRORS) {
-                        throw new Error(`Failed to scrape ${ticker} after ${MAX_ERRORS} attempts`);
+            await priceManager.ensureInitialized();
+            const updates = [];
+            let newUpdateCallback = null;
+            let isActive = true;
+            const subscriber = {
+                ticker,
+                sendUpdate: (data) => {
+                    if (!isActive)
+                        return;
+                    if (newUpdateCallback) {
+                        newUpdateCallback(data);
+                        newUpdateCallback = null;
                     }
-                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    else {
+                        updates.push(data);
+                    }
                 }
+            };
+            try {
+                await priceManager.subscribe(ticker, subscriber);
+            }
+            catch (error) {
+                console.error(`❌ Subscription failed for ${ticker}:`, error);
+                if (error instanceof Error && error.message.includes('not found')) {
+                    throw new ConnectError(`Ticker ${ticker} not found on TradingView`, Code.NotFound);
+                }
+                throw new ConnectError(`Failed to subscribe to ${ticker}: ${error instanceof Error ? error.message : 'Unknown error'}`, Code.Internal);
+            }
+            try {
+                while (isActive) {
+                    const nextUpdate = await new Promise((resolve, reject) => {
+                        if (updates.length > 0) {
+                            resolve(updates.shift());
+                        }
+                        else {
+                            newUpdateCallback = resolve;
+                            setTimeout(() => {
+                                if (newUpdateCallback === resolve) {
+                                    newUpdateCallback = null;
+                                    resolve({
+                                        ticker,
+                                        price: -404,
+                                        timestamp: new Date()
+                                    });
+                                }
+                            }, 5000);
+                        }
+                    });
+                    if (nextUpdate.price !== -404) {
+                        const response = {
+                            ticker: nextUpdate.ticker,
+                            price: nextUpdate.price,
+                            $typeName: 'project_pluto.price.PriceUpdate'
+                        };
+                        yield response;
+                    }
+                }
+            }
+            finally {
+                isActive = false;
+                priceManager.unsubscribe(ticker, subscriber);
+                console.log(`📡 Ended subscription for ${ticker}`);
             }
         }
         catch (error) {
-            if (error instanceof Error) {
-                console.error(`❌ Fatal error in ${ticker} feed:`, error.message);
-                throw new Error(`Failed to stream prices for ${ticker}: ${error.message}`);
+            console.error(`❌ Error in ${ticker} subscription:`, error);
+            if (error instanceof ConnectError) {
+                throw error;
             }
-            else {
-                console.error(`❌ Unknown fatal error in ${ticker} feed:`, error);
-                throw new Error(`Unexpected error occurred while streaming ${ticker} prices`);
-            }
+            throw new ConnectError(`Internal server error for ${ticker}`, Code.Internal);
+        }
+    },
+    async removeTickerMethod(req, context) {
+        console.log('🔄 removeTicker method CALLED with:', req);
+        const ticker = req.ticker.toUpperCase();
+        console.log(`🗑️ ConnectRPC removing ticker: ${ticker}`);
+        try {
+            const priceManager = getPriceManager();
+            await priceManager.removeTicker(ticker);
+            const response = {
+                success: true,
+                message: `Successfully removed ${ticker} and closed Playwright tab`,
+                $typeName: 'project_pluto.price.RemoveTickerResponse'
+            };
+            return response;
+        }
+        catch (error) {
+            console.error(`❌ Error removing ticker ${ticker}:`, error);
+            const response = {
+                success: false,
+                message: `Failed to remove ${ticker}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                $typeName: 'project_pluto.price.RemoveTickerResponse'
+            };
+            return response;
         }
     }
 };

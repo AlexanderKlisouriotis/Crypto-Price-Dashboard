@@ -14,6 +14,7 @@ export declare class TradingViewScraper {
     subscribeToTicker(ticker: string): Promise<AsyncIterable<PriceData>>;
     private createPriceStream;
     getPrice(ticker: string): Promise<PriceData>;
+    closeTickerPage(ticker: string): Promise<void>;
     close(): Promise<void>;
 }
 export declare function getScraper(): TradingViewScraper;

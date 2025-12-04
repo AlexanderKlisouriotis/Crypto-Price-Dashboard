@@ -1,0 +1,6 @@
+node_modules
+frontend.log
+server/server.log
+filenamecurl
+filename
+price_data.bin
