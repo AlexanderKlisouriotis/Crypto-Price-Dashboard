@@ -1,123 +1,106 @@
 .container {
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: 2rem;
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: 'Inter', sans-serif;
 }
 
 .main {
+  flex: 1;
   width: 100%;
-  max-width: 800px;
+  max-width: 1200px;
+  /* Constrain width like GitHub */
+  margin: 0 auto;
+  padding: 0 2rem;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
-  /* Glass card container */
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  border-radius: var(--border-radius);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 2rem;
 }
 
-.ticker-form {
-  display: flex;
-  gap: 1rem;
-}
-
-.ticker-form input {
-  flex: 1;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--gray-alpha-200);
-  border-radius: var(--border-radius);
-  background: transparent;
-  color: var(--foreground);
-}
-
-.ticker-form button {
-  /* Use accent button style */
-  background: var(--gradient-primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--border-radius);
-  padding: 0.75rem 1.5rem;
-  cursor: pointer;
-  font-weight: 500;
-  transition: transform var(--transition-speed), box-shadow var(--transition-speed);
-}
-
-.ticker-form button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.ticker-list {
-  background: var(--glass-bg);
-  backdrop-filter: blur(8px);
-  border-radius: var(--border-radius);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 1.5rem;
-}
-
-.ticker-list h2 {
-  margin: 0 0 1rem 0;
-  font-size: 1.5rem;
-}
-
-.ticker-list ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.ticker-item {
+/* Navbar Style */
+.header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--gray-alpha-200);
+  padding: 1rem 0;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--card-border);
 }
 
-.ticker-item:last-child {
-  border-bottom: none;
+.logo {
+  color: var(--foreground);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.ticker-item .symbol {
+/* Simplified Hero / Intro */
+.hero {
+  text-align: center;
+  margin-bottom: 3rem;
+  padding: 3rem 0;
+}
+
+.heroContent {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.heroTitle {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.heroSubtitle {
+  font-size: 1.1rem;
+  color: var(--secondary);
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+
+/* Ticker Grid - Instagram style cards */
+.tickerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  padding-bottom: 4rem;
+}
+
+.sectionTitle {
+  font-size: 1.25rem;
   font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: var(--foreground);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.ticker-item .price {
-  margin-left: 1rem;
-}
-
-.ticker-item .remove-btn {
-  background: transparent;
-  border: none;
-  color: var(--color-primary);
-  font-size: 1.2rem;
-  cursor: pointer;
-  transition: color var(--transition-speed);
-}
-
-.ticker-item .remove-btn:hover {
-  color: var(--color-primary-dark);
+/* Form Section */
+.formSection {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2rem;
 }
 
 /* Responsive */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .main {
-    padding: 1rem;
+    padding: 0 1rem;
   }
 
-  .ticker-form {
-    flex-direction: column;
+  .heroTitle {
+    font-size: 2rem;
   }
 
-  .ticker-form button {
-    width: 100%;
+  .tickerGrid {
+    grid-template-columns: 1fr;
   }
 }
